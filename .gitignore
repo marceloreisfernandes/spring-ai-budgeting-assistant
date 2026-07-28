@@ -1,0 +1,38 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# Java
+*.class
+*.jar
+*.war
+*.log
+hs_err_pid*
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+application-secrets.properties
+application-local.properties
+
+# Operating systems
+.DS_Store
+Thumbs.db
+
+# Generated audio
+*.mp3
+*.wav
+*.m4a
+
+# Temporary files
+tmp/
+temp/
