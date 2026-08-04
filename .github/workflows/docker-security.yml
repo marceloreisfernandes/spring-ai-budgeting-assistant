@@ -1,0 +1,50 @@
+name: Docker Build & Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # --pull matches the base image tag policy documented in the Dockerfile: floating
+      # minor-version tags (21-jdk-jammy, 21-jre-alpine) are meant to be rebuilt against the
+      # latest patched layer, not pinned by digest.
+      - name: Build image
+        run: docker build --pull -t spring-ai-budgeting-assistant:ci .
+
+      - name: Save image for scanning
+        run: docker save spring-ai-budgeting-assistant:ci -o image.tar
+
+      # Official Trivy image pinned by digest, not the aquasecurity/trivy-action marketplace
+      # Action - see the comment in gitleaks.yml for why (the March 2026 trivy-action
+      # supply-chain compromise). Scanning a saved tarball, instead of mounting the host
+      # Docker socket into the scanner container, also avoids handing that container control
+      # of the host's Docker daemon.
+      - name: Scan image with Trivy
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspace" \
+            aquasec/trivy@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c \
+            image --input /workspace/image.tar --severity HIGH,CRITICAL --exit-code 1
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: spring-ai-budgeting-assistant:ci
+          format: cyclonedx-json
+          output-file: sbom.cyclonedx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom
+          path: sbom.cyclonedx.json
