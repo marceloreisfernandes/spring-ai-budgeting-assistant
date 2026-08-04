@@ -1,0 +1,32 @@
+services:
+  database:
+    image: postgres:18-alpine
+    environment:
+      # POSTGRES_USER/POSTGRES_PASSWORD here are the bootstrap superuser Postgres' own entrypoint
+      # requires to run initdb - fixed and internal-only, never used by the application. The
+      # application's actual role (APP_DB_USER/APP_DB_PASSWORD, taken from .env) is created
+      # without SUPERUSER by docker/postgres/init/01-create-app-role.sh; see that script for why
+      # this is two identities instead of one (PostgreSQL refuses to strip SUPERUSER from the
+      # bootstrap superuser itself).
+      POSTGRES_DB: ${POSTGRES_DB:-budgeting}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set, see .env.example}
+      APP_DB_USER: ${POSTGRES_USER:-budgeting_app}
+      APP_DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set, see .env.example}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - budgeting_postgres_data:/var/lib/postgresql
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-budgeting_app} -d ${POSTGRES_DB:-budgeting}"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  budgeting_postgres_data:
