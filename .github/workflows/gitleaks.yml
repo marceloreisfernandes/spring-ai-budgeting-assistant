@@ -1,0 +1,32 @@
+name: Gitleaks Secret Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # Run the official Gitleaks image pinned by digest rather than the gitleaks-action
+      # marketplace Action. In March 2026, aquasecurity/trivy-action (a comparable
+      # third-party scanner Action) had 75 of 76 version tags force-pushed to malicious
+      # commits; a floating tag on any marketplace Action can be repointed by its
+      # maintainer's account being compromised. Pinning the scanner by container digest
+      # instead removes that whole class of risk for this job. See
+      # docs/security/security-controls.md for the full write-up of this decision.
+      - name: Run Gitleaks
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/repo" \
+            zricethezav/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
+            detect --source /repo --redact -v

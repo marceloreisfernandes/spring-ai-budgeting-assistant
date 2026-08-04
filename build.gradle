@@ -1,0 +1,101 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '4.1.0'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'dev.tetel.budgeting'
+version = '0.0.1-SNAPSHOT'
+description = 'Secure budgeting assistant API with Spring Boot and Spring AI'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+ext {
+	set('springAiVersion', "2.0.0")
+	// Netty version bumped past what Spring Boot 4.1.0's own BOM manages (4.2.15.Final), to pick
+	// up fixes for CVE-2026-59901/55831/55833/56745/56819/56816 (all fixed in 4.2.16.Final).
+	// Netty is never a direct dependency here - it arrives transitively through
+	// spring-ai-starter-model-openai -> spring-boot-starter-webclient -> reactor-netty, which is
+	// how the OpenAI Java SDK makes HTTP calls. Imported as a BOM (not per-module version forcing)
+	// so every io.netty:* module stays on a mutually consistent version.
+	set('nettyBomVersion', "4.2.16.Final")
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-flyway'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.flywaydb:flyway-database-postgresql'
+	implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+	runtimeOnly 'org.postgresql:postgresql'
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-flyway-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+	testImplementation 'org.testcontainers:testcontainers-postgresql'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+		// Imported after spring-ai-bom so it wins for the io.netty:* coordinates both BOMs manage.
+		mavenBom "io.netty:netty-bom:${nettyBomVersion}"
+	}
+	dependencies {
+		// CVE-2026-54291 (SCRAM-SHA-256-PLUS downgrade): fixed in 42.7.12; Spring Boot 4.1.0's
+		// own BOM still manages 42.7.11. The JDBC driver is forward/backward compatible across
+		// PostgreSQL server major versions, so this is a safe, isolated patch bump.
+		dependency 'org.postgresql:postgresql:42.7.13'
+	}
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+	// Standard test suite never calls OpenAI: OpenAiIntegrationTest-tagged tests live in a
+	// separate source set (see openAiIntegrationTest below) and are excluded here by construction.
+}
+
+sourceSets {
+	openAiIntegrationTest {
+		java.srcDir 'src/openAiIntegrationTest/java'
+		resources.srcDir 'src/openAiIntegrationTest/resources'
+		compileClasspath += sourceSets.main.output + sourceSets.test.output
+		runtimeClasspath += sourceSets.main.output + sourceSets.test.output
+	}
+}
+
+configurations {
+	openAiIntegrationTestImplementation.extendsFrom testImplementation
+	openAiIntegrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+tasks.register('openAiIntegrationTest', Test) {
+	description = 'Opt-in tests that make live, potentially billable calls to the OpenAI API. ' +
+			'Requires OPENAI_API_KEY. Not part of test/check and never run by CI.'
+	group = 'verification'
+	testClassesDirs = sourceSets.openAiIntegrationTest.output.classesDirs
+	classpath = sourceSets.openAiIntegrationTest.runtimeClasspath
+	useJUnitPlatform()
+	onlyIf {
+		def hasKey = System.getenv('OPENAI_API_KEY') != null
+		if (!hasKey) {
+			logger.lifecycle('Skipping openAiIntegrationTest: OPENAI_API_KEY is not set.')
+		}
+		hasKey
+	}
+}

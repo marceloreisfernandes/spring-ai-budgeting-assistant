@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      # Testcontainers-based integration tests need Docker; GitHub-hosted ubuntu-latest runners
+      # ship with the Docker Engine already running, so no extra setup is required here.
+      #
+      # No secret is required for this job: OPENAI_API_KEY, POSTGRES_PASSWORD, and the app
+      # security credentials all have non-functional local-only placeholder defaults in
+      # application.properties, purely so the Spring context can start in tests. See
+      # docs/security/secret-management.md.
+      - name: Build and run the full test suite
+        run: ./gradlew build
