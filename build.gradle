@@ -20,6 +20,13 @@ repositories {
 
 ext {
 	set('springAiVersion', "2.0.0")
+	// Netty version bumped past what Spring Boot 4.1.0's own BOM manages (4.2.15.Final), to pick
+	// up fixes for CVE-2026-59901/55831/55833/56745/56819/56816 (all fixed in 4.2.16.Final).
+	// Netty is never a direct dependency here - it arrives transitively through
+	// spring-ai-starter-model-openai -> spring-boot-starter-webclient -> reactor-netty, which is
+	// how the OpenAI Java SDK makes HTTP calls. Imported as a BOM (not per-module version forcing)
+	// so every io.netty:* module stays on a mutually consistent version.
+	set('nettyBomVersion', "4.2.16.Final")
 }
 
 dependencies {
@@ -46,6 +53,14 @@ dependencies {
 dependencyManagement {
 	imports {
 		mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+		// Imported after spring-ai-bom so it wins for the io.netty:* coordinates both BOMs manage.
+		mavenBom "io.netty:netty-bom:${nettyBomVersion}"
+	}
+	dependencies {
+		// CVE-2026-54291 (SCRAM-SHA-256-PLUS downgrade): fixed in 42.7.12; Spring Boot 4.1.0's
+		// own BOM still manages 42.7.11. The JDBC driver is forward/backward compatible across
+		// PostgreSQL server major versions, so this is a safe, isolated patch bump.
+		dependency 'org.postgresql:postgresql:42.7.13'
 	}
 }
 
