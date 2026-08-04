@@ -11,7 +11,7 @@
 # docs/security/security-controls.md) to carry newer libexpat/p11-kit builds than the image tag
 # had baked in, from the same v3.23 repository the image already trusts. Trivy in CI
 # (docker-security.yml) is the control that catches drift if either mechanism falls behind. ---
-FROM eclipse-temurin:21-jdk-jammy AS build
+FROM eclipse-temurin:22-jdk-jammy AS build
 WORKDIR /workspace
 
 COPY gradlew ./
@@ -24,7 +24,7 @@ COPY src src
 RUN ./gradlew clean bootJar --no-daemon -x test
 
 # --- Runtime stage: minimal JRE, non-root user, nothing but the jar. ---
-FROM eclipse-temurin:21-jre-alpine AS runtime
+FROM eclipse-temurin:25-jre-alpine AS runtime
 WORKDIR /app
 
 # Patches OS packages from the same Alpine repository the base image already uses (no new
