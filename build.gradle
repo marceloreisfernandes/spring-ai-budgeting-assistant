@@ -60,7 +60,7 @@ dependencyManagement {
 		// CVE-2026-54291 (SCRAM-SHA-256-PLUS downgrade): fixed in 42.7.12; Spring Boot 4.1.0's
 		// own BOM still manages 42.7.11. The JDBC driver is forward/backward compatible across
 		// PostgreSQL server major versions, so this is a safe, isolated patch bump.
-		dependency 'org.postgresql:postgresql:42.7.13'
+		dependency 'org.postgresql:postgresql:42.7.14'
 	}
 }
 
